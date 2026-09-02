@@ -2,7 +2,7 @@ name: AI News Notify
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 0 * * *" # 毎朝9:00 JST (UTC+9のため 0:00 UTC)
   workflow_dispatch: {}
 
 permissions:
