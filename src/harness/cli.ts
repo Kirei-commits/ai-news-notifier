@@ -5,7 +5,7 @@ import { formatUsage } from "./cost.js";
 import { newRunId, run } from "./loop.js";
 import { redactSecrets } from "./hooks.js";
 import { defaultGate, stdinAskResolver } from "./permission.js";
-import { createProvider, type ProviderName } from "./providers/index.js";
+import { ConfigError, createProvider, type ProviderName } from "./providers/index.js";
 import { loadSkills, readSkillTool, renderSkillIndex } from "./skills.js";
 import { NEWS_SYSTEM_PROMPT, newsTools } from "./tools/news.js";
 import { combineTracers, consoleTracer, fileTracer } from "./trace.js";
@@ -80,12 +80,20 @@ async function main() {
   console.error(`--- trace: .harness/traces/${runId}.jsonl`);
   if (!values.execute) console.error("--- dry-run (実投稿するには --execute)");
   if (result.error) {
-    console.error(result.error);
+    // 認証エラーはスタックではなく直し方を出す。実行時に初めて出る種類の設定ミス。
+    if (/authentication|api[_ -]?key|Authorization/i.test(result.error.message)) {
+      console.error(
+        "エラー: モデルの認証情報がありません。ANTHROPIC_API_KEY を設定するか `ant auth login` を実行してください。"
+      );
+    } else {
+      console.error(result.error);
+    }
     process.exitCode = 1;
   }
 }
 
 main().catch((err) => {
-  console.error(err);
+  // 設定ミスにスタックトレースを出しても読む人の役に立たない。
+  console.error(err instanceof ConfigError ? `エラー: ${err.message}` : err);
   process.exitCode = 1;
 });
