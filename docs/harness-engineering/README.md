@@ -34,7 +34,7 @@ Claude Code も Cursor も Devin も「ハーネスが製品」であって、�
 | 3 | コンテキストエンジニアリング | `src/harness/context.ts` | ✅ |
 | 4 | 権限と安全 | `src/harness/permission.ts` | ✅ |
 | 5 | 観測性 | `trace.ts` / `cost.ts` / `providers/replay.ts` | ✅ |
-| 6 | 評価 (Evals) | タスクセットと自動採点 | 未 |
+| 6 | 評価 (Evals) | `evals/` | ✅ |
 | 7 | 拡張機構 | サブエージェント / フック / スキル | 未 |
 | 8 | 運用 | リトライ・レート制限・キャッシュ | 未 |
 
@@ -197,7 +197,19 @@ loop:
 
 ---
 
+## 使い方
+
+```bash
+npm test                       # ハーネス自体のユニットテスト (API不要)
+npm run eval                   # 評価スイート (モック実行・API不要)
+npm run eval -- --provider anthropic   # 実モデルで評価 (課金あり)
+npm run agent -- "今日のAIニュースをまとめてDiscordに投稿して"   # 既定は dry-run
+npm run agent -- "..." --execute       # 実際に投稿する
+```
+
+トレースは `.harness/traces/<runId>.jsonl` に残る。
+
 ## 進め方
 
-各フェーズは `docs/harness-engineering/phase-NN-*.md` に「実装で分かったこと」を残す。
-コードだけ残しても再現できないため、判断の理由を書くこと。
+各フェーズで分かったことは `docs/harness-engineering/notes.md` に残す。
+コードだけ残しても判断の理由は再現できない。

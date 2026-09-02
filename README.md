@@ -38,3 +38,16 @@ npm start
 3. Actionsタブから手動実行 (workflow_dispatch) して動作確認
 
 既知の記事は `data/seen.json` に記録し、重複通知を防いでいます(ワークフローが自動でコミットします)。
+
+## エージェントハーネス (学習用)
+
+`src/harness/` に、このリポジトリを題材にした自作エージェントハーネスがあります。
+設計と学習計画は [docs/harness-engineering/README.md](docs/harness-engineering/README.md) を参照。
+
+```bash
+npm test                                # ハーネスのユニットテスト (API不要)
+npm run eval                            # 評価スイート (モック実行・API不要)
+npm run agent -- "今日のAIニュースをまとめてDiscordに投稿して"   # 既定は dry-run
+```
+
+定期通知の本体 (`npm start`) はこのハーネスとは独立して動きます。
