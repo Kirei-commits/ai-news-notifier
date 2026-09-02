@@ -30,6 +30,15 @@ export type HarnessEvent =
     }
   | { type: "tool_start"; turn: number; toolUseId: string; name: string; input: unknown }
   | {
+      type: "permission";
+      turn: number;
+      toolUseId: string;
+      name: string;
+      behavior: "allow" | "deny" | "ask";
+      resolved: "allow" | "deny";
+      reason?: string;
+    }
+  | {
       type: "tool_end";
       turn: number;
       toolUseId: string;
@@ -108,6 +117,9 @@ export function consoleTracer(write: (line: string) => void = console.error): Tr
         }
         case "tool_start":
           write(`  🔧 ${event.name}(${JSON.stringify(event.input)})`);
+          break;
+        case "permission":
+          if (event.resolved === "deny") write(`  ⛔ ${event.name} 拒否: ${event.reason ?? ""}`);
           break;
         case "tool_end":
           write(

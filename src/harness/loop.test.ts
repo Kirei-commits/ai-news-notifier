@@ -200,6 +200,7 @@ describe("agent loop", () => {
       "model_request",
       "model_response",
       "tool_start",
+      "permission",
       "tool_end",
       "turn_start",
       "model_request",

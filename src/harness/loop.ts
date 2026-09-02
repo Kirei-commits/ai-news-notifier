@@ -1,3 +1,9 @@
+import {
+  allowAll,
+  denyOnAsk,
+  type AskResolver,
+  type PermissionGate,
+} from "./permission.js";
 import { formatValidationError, toolRegistry, type Tool, type ToolContext } from "./tool.js";
 import { memoryTracer, type Tracer } from "./trace.js";
 import {
@@ -25,6 +31,10 @@ export interface RunConfig {
   /** 1 ツール結果あたりの上限文字数。コンテキスト枯渇の最大要因を抑える。 */
   maxToolResultChars?: number;
   dryRun?: boolean;
+  /** ツール実行の直前に挟む権限ゲート。既定は全許可。 */
+  permission?: PermissionGate;
+  /** ask を解決する係。既定は deny (無人実行を止めないため)。 */
+  askResolver?: AskResolver;
   signal?: AbortSignal;
   tracer?: Tracer;
   runId?: string;
@@ -66,6 +76,9 @@ export async function run(input: string | Message[], config: RunConfig): Promise
   const runId = config.runId ?? newRunId();
   const tracer = config.tracer ?? memoryTracer();
   const registry = toolRegistry(config.tools);
+  const permission = config.permission ?? allowAll;
+  const askResolver = config.askResolver ?? denyOnAsk;
+  const callCounts = new Map<string, number>();
   const specs = config.tools.map((t) => t.spec);
 
   const messages: Message[] = typeof input === "string" ? [userText(input)] : [...input];
@@ -134,9 +147,28 @@ export async function run(input: string | Message[], config: RunConfig): Promise
       break;
     }
 
+    // 呼び出し回数は並列実行の前に確定させる (同一ターン内の重複呼び出しを数えるため)。
+    const numbered = toolUses.map((use) => {
+      const priorCalls = callCounts.get(use.name) ?? 0;
+      callCounts.set(use.name, priorCalls + 1);
+      return { use, priorCalls };
+    });
+
     // 並列に実行して、tool_use と同じ順序で結果を並べる。
     const results = await Promise.all(
-      toolUses.map((use) => executeToolUse(use, registry, ctx, tracer, turn, maxToolResultChars))
+      numbered.map(({ use, priorCalls }) =>
+        executeToolUse({
+          use,
+          priorCalls,
+          registry,
+          ctx,
+          tracer,
+          turn,
+          maxChars: maxToolResultChars,
+          permission,
+          askResolver,
+        })
+      )
     );
 
     // 重要: ツール結果は必ず 1 つの user メッセージにまとめる。
@@ -159,14 +191,20 @@ export async function run(input: string | Message[], config: RunConfig): Promise
   return { runId, text, messages, stopReason, turns: turn, usage, tracer, error };
 }
 
-async function executeToolUse(
-  use: ToolUseBlock,
-  registry: Map<string, Tool<never>>,
-  ctx: ToolContext,
-  tracer: Tracer,
-  turn: number,
-  maxChars: number
-): Promise<ToolResultBlock> {
+interface ExecuteArgs {
+  use: ToolUseBlock;
+  priorCalls: number;
+  registry: Map<string, Tool<never>>;
+  ctx: ToolContext;
+  tracer: Tracer;
+  turn: number;
+  maxChars: number;
+  permission: PermissionGate;
+  askResolver: AskResolver;
+}
+
+async function executeToolUse(args: ExecuteArgs): Promise<ToolResultBlock> {
+  const { use, registry, ctx, tracer, turn, maxChars } = args;
   tracer.emit({ type: "tool_start", turn, toolUseId: use.id, name: use.name, input: use.input });
   const startedAt = Date.now();
 
@@ -199,6 +237,40 @@ async function executeToolUse(
     parsed = tool.inputSchema.validate(use.input, "");
   } catch (err) {
     return finish(formatValidationError(tool, err), true);
+  }
+
+  // 権限判定は「検証済みの入力」に対して行う。モデルの説明文ではなく実引数で決める。
+  const decision = await args.permission({
+    tool,
+    input: parsed,
+    turn,
+    priorCalls: args.priorCalls,
+    dryRun: ctx.dryRun,
+  });
+  let resolved: "allow" | "deny" = decision.behavior === "allow" ? "allow" : "deny";
+  if (decision.behavior === "ask") {
+    const approved = await args.askResolver(
+      { tool, input: parsed, turn, priorCalls: args.priorCalls, dryRun: ctx.dryRun },
+      decision.reason
+    );
+    resolved = approved ? "allow" : "deny";
+  }
+  tracer.emit({
+    type: "permission",
+    turn,
+    toolUseId: use.id,
+    name: use.name,
+    behavior: decision.behavior,
+    resolved,
+    reason: decision.behavior === "allow" ? undefined : decision.reason,
+  });
+  if (resolved === "deny") {
+    const reason = decision.behavior === "allow" ? "denied" : decision.reason;
+    // 拒否もモデルに返す。理由が分かれば別の手段に切り替えられる。
+    return finish(
+      `Permission denied for "${use.name}": ${reason}. Do not retry this call; continue without it or report the limitation.`,
+      true
+    );
   }
 
   try {

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
 import { newRunId, run } from "./loop.js";
+import { defaultGate, stdinAskResolver } from "./permission.js";
 import { createProvider, type ProviderName } from "./providers/index.js";
 import { NEWS_SYSTEM_PROMPT, newsTools } from "./tools/news.js";
 import { combineTracers, consoleTracer, fileTracer } from "./trace.js";
@@ -52,6 +53,8 @@ async function main() {
     tools: newsTools,
     maxTurns: Number(values["max-turns"]),
     dryRun: !values.execute,
+    permission: defaultGate(),
+    askResolver: stdinAskResolver(),
     signal: controller.signal,
     tracer,
   });
