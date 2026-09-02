@@ -33,6 +33,12 @@ export interface Tool<T = unknown> {
   execute(input: T, ctx: ToolContext): Promise<string | ToolOutput>;
 }
 
+/**
+ * ツール一覧に入れるための型。入力の型はツール定義の中に閉じているので、
+ * 集合として扱うときは入力型を消す。
+ */
+export type AnyTool = Tool<never>;
+
 export interface ToolDefinition<S extends ObjectShape> {
   name: string;
   /**
@@ -80,8 +86,8 @@ export function formatValidationError(tool: Tool, err: unknown): string {
   ].join("\n");
 }
 
-export function toolRegistry(tools: Tool<never>[]): Map<string, Tool<never>> {
-  const map = new Map<string, Tool<never>>();
+export function toolRegistry(tools: AnyTool[]): Map<string, AnyTool> {
+  const map = new Map<string, AnyTool>();
   for (const tool of tools) {
     if (map.has(tool.name)) throw new Error(`duplicate tool name: ${tool.name}`);
     map.set(tool.name, tool);

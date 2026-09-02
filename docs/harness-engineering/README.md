@@ -35,8 +35,8 @@ Claude Code も Cursor も Devin も「ハーネスが製品」であって、�
 | 4 | 権限と安全 | `src/harness/permission.ts` | ✅ |
 | 5 | 観測性 | `trace.ts` / `cost.ts` / `providers/replay.ts` | ✅ |
 | 6 | 評価 (Evals) | `evals/` | ✅ |
-| 7 | 拡張機構 | サブエージェント / フック / スキル | 未 |
-| 8 | 運用 | リトライ・レート制限・キャッシュ | 未 |
+| 7 | 拡張機構 | `hooks.ts` / `subagent.ts` / `skills.ts` + `skills/` | ✅ |
+| 8 | 運用 | `retry.ts` (キャッシュ計測・冪等性は未) | 一部 |
 
 ---
 

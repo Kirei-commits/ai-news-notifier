@@ -3,8 +3,10 @@ import { parseArgs } from "node:util";
 import { elideOldToolResults } from "./context.js";
 import { formatUsage } from "./cost.js";
 import { newRunId, run } from "./loop.js";
+import { redactSecrets } from "./hooks.js";
 import { defaultGate, stdinAskResolver } from "./permission.js";
 import { createProvider, type ProviderName } from "./providers/index.js";
+import { loadSkills, readSkillTool, renderSkillIndex } from "./skills.js";
 import { NEWS_SYSTEM_PROMPT, newsTools } from "./tools/news.js";
 import { combineTracers, consoleTracer, fileTracer } from "./trace.js";
 
@@ -48,15 +50,23 @@ async function main() {
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
 
+  // スキルは索引だけをシステムプロンプトに載せ、本文は read_skill で読ませる。
+  const skills = loadSkills();
+  const system = skills.length > 0
+    ? `${NEWS_SYSTEM_PROMPT}\n\n${renderSkillIndex(skills)}`
+    : NEWS_SYSTEM_PROMPT;
+  const tools = skills.length > 0 ? [...newsTools, readSkillTool(skills)] : newsTools;
+
   const result = await run(input, {
     runId,
     provider: createProvider(values.provider as ProviderName, values.model),
-    system: NEWS_SYSTEM_PROMPT,
-    tools: newsTools,
+    system,
+    tools,
     maxTurns: Number(values["max-turns"]),
     dryRun: !values.execute,
     contextStrategy: elideOldToolResults({ maxTokens: 120_000 }),
     permission: defaultGate(),
+    hooks: redactSecrets(),
     askResolver: stdinAskResolver(),
     signal: controller.signal,
     tracer,

@@ -1,4 +1,4 @@
-import type { Tool, ToolKind } from "./tool.js";
+import type { AnyTool, ToolKind } from "./tool.js";
 
 /**
  * 権限ゲート。
@@ -14,7 +14,7 @@ export type PermissionDecision =
   | { behavior: "ask"; reason: string };
 
 export interface PermissionRequest {
-  tool: Tool<never>;
+  tool: AnyTool;
   /** スキーマ検証を通った後の入力。 */
   input: unknown;
   turn: number;

@@ -1,11 +1,12 @@
 import { estimateMessageTokens, noCompaction, type ContextStrategy } from "./context.js";
+import type { HarnessHooks } from "./hooks.js";
 import {
   allowAll,
   denyOnAsk,
   type AskResolver,
   type PermissionGate,
 } from "./permission.js";
-import { formatValidationError, toolRegistry, type Tool, type ToolContext } from "./tool.js";
+import { formatValidationError, toolRegistry, type AnyTool, type ToolContext } from "./tool.js";
 import { memoryTracer, type Tracer } from "./trace.js";
 import {
   addUsage,
@@ -25,7 +26,7 @@ export type RunStopReason = "done" | "max_turns" | "aborted" | "refusal" | "erro
 export interface RunConfig {
   provider: Provider;
   system: string;
-  tools: Tool<never>[];
+  tools: AnyTool[];
   /** 無限ループ防止。ハーネスに必須の安全装置。 */
   maxTurns?: number;
   maxOutputTokens?: number;
@@ -34,6 +35,8 @@ export interface RunConfig {
   dryRun?: boolean;
   /** モデル呼び出し前にコンテキストを整える戦略。既定は何もしない。 */
   contextStrategy?: ContextStrategy;
+  /** ツール実行の前後に差し込む処理。入力の書き換えと出力の加工に使う。 */
+  hooks?: HarnessHooks;
   /** ツール実行の直前に挟む権限ゲート。既定は全許可。 */
   permission?: PermissionGate;
   /** ask を解決する係。既定は deny (無人実行を止めないため)。 */
@@ -186,6 +189,7 @@ export async function run(input: string | Message[], config: RunConfig): Promise
           maxChars: maxToolResultChars,
           permission,
           askResolver,
+          hooks: config.hooks,
         })
       )
     );
@@ -213,13 +217,14 @@ export async function run(input: string | Message[], config: RunConfig): Promise
 interface ExecuteArgs {
   use: ToolUseBlock;
   priorCalls: number;
-  registry: Map<string, Tool<never>>;
+  registry: Map<string, AnyTool>;
   ctx: ToolContext;
   tracer: Tracer;
   turn: number;
   maxChars: number;
   permission: PermissionGate;
   askResolver: AskResolver;
+  hooks?: HarnessHooks;
 }
 
 async function executeToolUse(args: ExecuteArgs): Promise<ToolResultBlock> {
@@ -292,9 +297,25 @@ async function executeToolUse(args: ExecuteArgs): Promise<ToolResultBlock> {
     );
   }
 
+  // beforeToolUse で入力を書き換えられる。書き換え後も必ず再検証して不変条件を保つ。
+  if (args.hooks?.beforeToolUse) {
+    const rewritten = await args.hooks.beforeToolUse({ tool, input: parsed, turn });
+    if (rewritten) {
+      try {
+        parsed = tool.inputSchema.validate(rewritten.input, "");
+      } catch (err) {
+        return finish(formatValidationError(tool, err), true);
+      }
+    }
+  }
+
   try {
-    const output = await tool.execute(parsed as never, ctx);
-    if (typeof output === "string") return finish(output, false);
+    const raw = await tool.execute(parsed as never, ctx);
+    let output = typeof raw === "string" ? { content: raw } : raw;
+    if (args.hooks?.afterToolUse) {
+      const patched = await args.hooks.afterToolUse({ tool, input: parsed, output, turn });
+      if (patched) output = { ...output, ...patched };
+    }
     return finish(output.content, output.isError ?? false, output.meta);
   } catch (err) {
     // ツールの例外はループを殺さない。モデルは失敗から回復できる。

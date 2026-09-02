@@ -1,3 +1,4 @@
+import { HttpError, parseRetryAfter, withRetry, type RetryOptions } from "../retry.js";
 import type {
   ContentBlock,
   Message,
@@ -11,6 +12,7 @@ export interface GeminiProviderOptions {
   apiKey: string;
   model?: string;
   baseUrl?: string;
+  retry?: RetryOptions;
 }
 
 interface GeminiPart {
@@ -39,11 +41,14 @@ export class GeminiProvider implements Provider {
   readonly model: string;
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  private readonly retry: RetryOptions;
 
   constructor(options: GeminiProviderOptions) {
     this.apiKey = options.apiKey;
     this.model = options.model ?? "gemini-3.6-flash";
     this.baseUrl = options.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
+    // Anthropic SDK は再試行を内蔵しているが、生 fetch には無いので自前で被せる。
+    this.retry = options.retry ?? {};
   }
 
   async complete(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse> {
@@ -66,18 +71,23 @@ export class GeminiProvider implements Provider {
       generationConfig: { maxOutputTokens: request.maxOutputTokens },
     };
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
+    const data = await withRetry<GeminiResponse>(async () => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
 
-    if (!res.ok) {
-      throw new Error(`Gemini generateContent failed: ${res.status} ${await res.text()}`);
-    }
-
-    const data = (await res.json()) as GeminiResponse;
+      if (!res.ok) {
+        throw new HttpError(
+          res.status,
+          `Gemini generateContent failed: ${res.status} ${await res.text()}`,
+          parseRetryAfter(res.headers.get("retry-after"))
+        );
+      }
+      return (await res.json()) as GeminiResponse;
+    }, { ...this.retry, signal });
     const candidate = data.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
 
