@@ -7,9 +7,17 @@ AIの最新情報をRSSフィードから収集し、Discordに定期通知す�
 ```bash
 npm install
 cp .env.example .env
-# .env に DISCORD_WEBHOOK_URL を設定
+# .env に DISCORD_WEBHOOK_URL と GEMINI_API_KEY を設定
 npm start
 ```
+
+### Gemini API Keyの取得方法
+
+1. https://aistudio.google.com/apikey にアクセス(Googleアカウントでログイン)
+2. 「Create API key」でキーを発行
+3. `.env` の `GEMINI_API_KEY` に設定
+
+見出しの日本語翻訳に使用します。無料枠内で利用可能です。`GEMINI_API_KEY` が未設定の場合は英語のまま通知されます。
 
 ### Discord Webhook URLの取得方法
 
@@ -26,7 +34,7 @@ npm start
 `.github/workflows/notify.yml` が6時間ごとに自動実行します。
 
 1. GitHubにリポジトリを作成しこのコードをpush
-2. リポジトリの Settings → Secrets and variables → Actions で `DISCORD_WEBHOOK_URL` を登録
+2. リポジトリの Settings → Secrets and variables → Actions で `DISCORD_WEBHOOK_URL` と `GEMINI_API_KEY` を登録
 3. Actionsタブから手動実行 (workflow_dispatch) して動作確認
 
 既知の記事は `data/seen.json` に記録し、重複通知を防いでいます(ワークフローが自動でコミットします)。

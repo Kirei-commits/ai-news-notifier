@@ -3,8 +3,9 @@ import Parser from "rss-parser";
 import { FEED_SOURCES } from "./sources.js";
 import { loadSeen, saveSeen } from "./seenStore.js";
 import { postToDiscord } from "./discord.js";
+import { translateTitles } from "./translate.js";
 
-const MAX_ITEMS_PER_SOURCE = 5;
+const MAX_ITEMS_PER_SOURCE = 20;
 
 interface NewsItem {
   source: string;
@@ -61,6 +62,7 @@ async function main() {
   if (!webhookUrl) {
     throw new Error("DISCORD_WEBHOOK_URL is not set. Copy .env.example to .env and fill it in.");
   }
+  const geminiApiKey = process.env.GEMINI_API_KEY;
 
   const seen = await loadSeen();
   const allItems = await fetchAllFeeds();
@@ -69,6 +71,16 @@ async function main() {
   if (newItems.length === 0) {
     console.log("No new items.");
     return;
+  }
+
+  if (geminiApiKey) {
+    const translated = await translateTitles(
+      geminiApiKey,
+      newItems.map((item) => item.title)
+    );
+    newItems.forEach((item, i) => (item.title = translated[i]));
+  } else {
+    console.warn("[warn] GEMINI_API_KEY is not set; posting original (English) titles.");
   }
 
   await postToDiscord(webhookUrl, formatMessage(newItems));
