@@ -31,9 +31,9 @@ Claude Code も Cursor も Devin も「ハーネスが製品」であって、�
 | 0 | LLM API の素の形 | プロバイダ抽象と生リクエスト | ✅ |
 | 1 | エージェントループ | `src/harness/loop.ts` | ✅ |
 | 2 | ツール設計 | `src/harness/schema.ts` / `tool.ts` / `tools/` | ✅ |
-| 3 | コンテキストエンジニアリング | 予算管理・切り詰め・圧縮 | 未 |
-| 4 | 権限と安全 | 承認ゲート / dry-run | 未 |
-| 5 | 観測性 | トレース / コスト会計 / リプレイ | 一部 |
+| 3 | コンテキストエンジニアリング | `src/harness/context.ts` | ✅ |
+| 4 | 権限と安全 | `src/harness/permission.ts` | ✅ |
+| 5 | 観測性 | `trace.ts` / `cost.ts` / `providers/replay.ts` | ✅ |
 | 6 | 評価 (Evals) | タスクセットと自動採点 | 未 |
 | 7 | 拡張機構 | サブエージェント / フック / スキル | 未 |
 | 8 | 運用 | リトライ・レート制限・キャッシュ | 未 |

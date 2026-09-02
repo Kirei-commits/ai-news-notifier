@@ -20,6 +20,13 @@ export type HarnessEvent =
       input: Message[];
     }
   | { type: "turn_start"; turn: number }
+  | {
+      type: "context_edit";
+      turn: number;
+      savedTokens: number;
+      elidedResults: number;
+      tokensBefore: number;
+    }
   | { type: "model_request"; turn: number; messages: Message[] }
   | {
       type: "model_response";
@@ -117,6 +124,11 @@ export function consoleTracer(write: (line: string) => void = console.error): Tr
         }
         case "tool_start":
           write(`  🔧 ${event.name}(${JSON.stringify(event.input)})`);
+          break;
+        case "context_edit":
+          write(
+            `  ✂ context: ${event.elidedResults} 件のツール結果を圧縮 (~${event.savedTokens} tokens 削減)`
+          );
           break;
         case "permission":
           if (event.resolved === "deny") write(`  ⛔ ${event.name} 拒否: ${event.reason ?? ""}`);

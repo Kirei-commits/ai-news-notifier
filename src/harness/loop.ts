@@ -1,3 +1,4 @@
+import { estimateMessageTokens, noCompaction, type ContextStrategy } from "./context.js";
 import {
   allowAll,
   denyOnAsk,
@@ -31,6 +32,8 @@ export interface RunConfig {
   /** 1 ツール結果あたりの上限文字数。コンテキスト枯渇の最大要因を抑える。 */
   maxToolResultChars?: number;
   dryRun?: boolean;
+  /** モデル呼び出し前にコンテキストを整える戦略。既定は何もしない。 */
+  contextStrategy?: ContextStrategy;
   /** ツール実行の直前に挟む権限ゲート。既定は全許可。 */
   permission?: PermissionGate;
   /** ask を解決する係。既定は deny (無人実行を止めないため)。 */
@@ -79,6 +82,7 @@ export async function run(input: string | Message[], config: RunConfig): Promise
   const permission = config.permission ?? allowAll;
   const askResolver = config.askResolver ?? denyOnAsk;
   const callCounts = new Map<string, number>();
+  const contextStrategy = config.contextStrategy ?? noCompaction;
   const specs = config.tools.map((t) => t.spec);
 
   const messages: Message[] = typeof input === "string" ? [userText(input)] : [...input];
@@ -112,6 +116,21 @@ export async function run(input: string | Message[], config: RunConfig): Promise
     }
     turn += 1;
     tracer.emit({ type: "turn_start", turn });
+
+    // 圧縮結果は履歴に焼き込む。毎回元に戻すと同じ処理を繰り返すうえ、
+    // プロンプトキャッシュの前方一致も毎ターン壊れる。
+    const tokensBefore = estimateMessageTokens(messages);
+    const edited = contextStrategy(messages);
+    if (edited.edit) {
+      messages.splice(0, messages.length, ...edited.messages);
+      tracer.emit({
+        type: "context_edit",
+        turn,
+        savedTokens: edited.edit.savedTokens,
+        elidedResults: edited.edit.elidedResults,
+        tokensBefore,
+      });
+    }
     tracer.emit({ type: "model_request", turn, messages: structuredClone(messages) });
 
     let response;

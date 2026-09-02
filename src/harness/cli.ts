@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { parseArgs } from "node:util";
+import { elideOldToolResults } from "./context.js";
+import { formatUsage } from "./cost.js";
 import { newRunId, run } from "./loop.js";
 import { defaultGate, stdinAskResolver } from "./permission.js";
 import { createProvider, type ProviderName } from "./providers/index.js";
@@ -53,6 +55,7 @@ async function main() {
     tools: newsTools,
     maxTurns: Number(values["max-turns"]),
     dryRun: !values.execute,
+    contextStrategy: elideOldToolResults({ maxTokens: 120_000 }),
     permission: defaultGate(),
     askResolver: stdinAskResolver(),
     signal: controller.signal,
@@ -60,9 +63,11 @@ async function main() {
   });
 
   console.log(`\n${result.text}\n`);
+  const provider = values.provider as string;
   console.error(
-    `--- ${result.stopReason} / ${result.turns} turns / trace: .harness/traces/${runId}.jsonl`
+    `--- ${result.stopReason} / ${result.turns} turns / ${formatUsage(result.usage, values.model ?? (provider === "anthropic" ? "claude-opus-5" : "gemini"))}`
   );
+  console.error(`--- trace: .harness/traces/${runId}.jsonl`);
   if (!values.execute) console.error("--- dry-run (実投稿するには --execute)");
   if (result.error) {
     console.error(result.error);
