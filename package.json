@@ -8,9 +8,11 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "agent": "tsx src/harness/cli.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "dotenv": "^16.4.5",
     "rss-parser": "^3.13.0"
   },
