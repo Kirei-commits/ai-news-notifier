@@ -31,7 +31,8 @@ npm start
 
 ## 定期実行 (GitHub Actions)
 
-`.github/workflows/notify.yml` が6時間ごとに自動実行します。
+`.github/workflows/notify.yml` が毎日 9:00 JST (0:00 UTC) に自動実行します。
+頻度を変えたい場合は同ファイルの `cron` を編集してください。
 
 1. GitHubにリポジトリを作成しこのコードをpush
 2. リポジトリの Settings → Secrets and variables → Actions で `DISCORD_WEBHOOK_URL` と `GEMINI_API_KEY` を登録
