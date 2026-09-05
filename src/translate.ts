@@ -35,8 +35,12 @@ export async function translateTitles(apiKey: string, titles: string[]): Promise
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
   try {
-    const translated = text ? JSON.parse(text) : null;
-    if (Array.isArray(translated) && translated.length === titles.length) {
+    const translated: unknown = text ? JSON.parse(text) : null;
+    if (
+      Array.isArray(translated) &&
+      translated.length === titles.length &&
+      translated.every((t): t is string => typeof t === "string")
+    ) {
       return translated;
     }
   } catch {

@@ -7,7 +7,9 @@ const MAX_SEEN = 1000;
 export async function loadSeen(): Promise<Set<string>> {
   try {
     const raw = await readFile(SEEN_FILE, "utf-8");
-    return new Set(JSON.parse(raw));
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
   } catch {
     return new Set();
   }

@@ -21,19 +21,32 @@ export async function postToDiscord(webhookUrl: string, content: string): Promis
   }
 }
 
-function splitIntoChunks(text: string, limit: number): string[] {
-  const lines = text.split("\n");
+export function splitIntoChunks(text: string, limit: number): string[] {
   const chunks: string[] = [];
   let current = "";
 
-  for (const line of lines) {
-    if ((current + "\n" + line).length > limit) {
-      if (current) chunks.push(current);
-      current = line;
-    } else {
-      current = current ? `${current}\n${line}` : line;
+  const flush = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
     }
+  };
+
+  for (const line of text.split("\n")) {
+    // 1行だけで上限を超える場合は行内で強制的に分割する
+    if (line.length > limit) {
+      flush();
+      for (let i = 0; i < line.length; i += limit) {
+        chunks.push(line.slice(i, i + limit));
+      }
+      continue;
+    }
+    if (current && `${current}\n${line}`.length > limit) {
+      flush();
+    }
+    current = current ? `${current}\n${line}` : line;
   }
-  if (current) chunks.push(current);
+
+  flush();
   return chunks;
 }

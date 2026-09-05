@@ -1,0 +1,38 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1" # 毎週月曜 12:00 JST
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # スキャン結果を Code scanning にアップロードするため
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CodeQL を初期化
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: 解析を実行
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
